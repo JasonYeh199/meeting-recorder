@@ -3,12 +3,12 @@ import { defineConfig } from 'drizzle-kit';
 
 config({ path: '.env.local' });
 
-const url = process.env.TURSO_URL ?? 'file:./dev.db';
-const authToken = process.env.TURSO_AUTH_TOKEN;
+const url = process.env.DATABASE_URL;
+if (!url) throw new Error('DATABASE_URL 未設定');
 
 export default defineConfig({
   schema: './lib/db/schema.ts',
   out: './lib/db/migrations',
-  dialect: 'turso',
-  dbCredentials: { url, authToken },
+  dialect: 'postgresql',
+  dbCredentials: { url },
 });
