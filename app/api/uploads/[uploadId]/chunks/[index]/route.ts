@@ -2,8 +2,7 @@ import { NextRequest } from 'next/server';
 import { getDb } from '@/lib/db/client';
 import { uploadSessions } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import fs from 'fs';
-import path from 'path';
+import { saveChunk } from '@/lib/storage';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,14 +31,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
     return Response.json({ error: 'chunk 索引超出範圍' }, { status: 400 });
   }
 
-  // Write chunk to disk
-  const storagePath = process.env.AUDIO_STORAGE_PATH ?? './uploads';
-  const tmpDir = path.join(storagePath, 'tmp', uploadId);
-  fs.mkdirSync(tmpDir, { recursive: true });
-
-  const chunkPath = path.join(tmpDir, `chunk_${String(chunkIndex).padStart(3, '0')}`);
   const buffer = Buffer.from(await req.arrayBuffer());
-  fs.writeFileSync(chunkPath, buffer);
+  await saveChunk(uploadId, chunkIndex, buffer);
 
   // Update uploaded chunks list
   const uploadedChunks = session.uploadedChunks as number[];

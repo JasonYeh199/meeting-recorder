@@ -1,10 +1,11 @@
 import OpenAI from 'openai';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
 function getOpenAI() {
   const key = process.env.OPENAI_API_KEY;
-if (!key) throw new Error('OPENAI_API_KEY 未設定');
+  if (!key) throw new Error('OPENAI_API_KEY 未設定');
   return new OpenAI({ apiKey: key });
 }
 
@@ -23,7 +24,34 @@ export interface TranscriptResult {
 
 const MAX_BYTES = 24 * 1024 * 1024; // 24 MB (Whisper limit is 25 MB)
 
-export async function transcribeAudio(audioPath: string): Promise<TranscriptResult> {
+/**
+ * Transcribe audio from a local file path or a remote https:// URL.
+ * When given a URL (e.g. Vercel Blob), the file is downloaded to a temp
+ * directory first, then processed and cleaned up automatically.
+ */
+export async function transcribeAudio(audioPathOrUrl: string): Promise<TranscriptResult> {
+  // Remote URL (Vercel Blob) — download to a temp file first
+  if (audioPathOrUrl.startsWith('https://')) {
+    const res = await fetch(audioPathOrUrl);
+    if (!res.ok) throw new Error(`Failed to fetch audio for transcription: ${res.status}`);
+    const buffer = Buffer.from(await res.arrayBuffer());
+
+    // Infer extension from URL (fallback to .webm)
+    const urlExt = audioPathOrUrl.split('?')[0].split('.').pop() ?? 'webm';
+    const tmpPath = path.join(os.tmpdir(), `mr_audio_${Date.now()}.${urlExt}`);
+    fs.writeFileSync(tmpPath, buffer);
+
+    try {
+      return await transcribeLocalFile(tmpPath);
+    } finally {
+      fs.unlink(tmpPath, () => {});
+    }
+  }
+
+  return transcribeLocalFile(audioPathOrUrl);
+}
+
+async function transcribeLocalFile(audioPath: string): Promise<TranscriptResult> {
   const stats = fs.statSync(audioPath);
 
   if (stats.size <= MAX_BYTES) {

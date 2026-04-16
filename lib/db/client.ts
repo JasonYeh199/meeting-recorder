@@ -1,42 +1,19 @@
-import Database from 'better-sqlite3';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
-import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
+import { createClient } from '@libsql/client';
+import { drizzle } from 'drizzle-orm/libsql';
 import * as schema from './schema';
 import path from 'path';
-import fs from 'fs';
 
-let _db: ReturnType<typeof createDb> | null = null;
-let _migrated = false;
-
-function resolveSqlitePath(): string {
-  const raw = process.env.DATABASE_URL ?? '';
-  // Accept "file:./foo.db" or a bare path like "./foo.db"
-  // Ignore PostgreSQL/MySQL URLs
-  if (!raw || raw.startsWith('postgresql') || raw.startsWith('postgres') || raw.startsWith('mysql')) {
-    return path.resolve('./dev.db');
-  }
-  return path.resolve(raw.replace(/^file:/, ''));
-}
-
-function createDb() {
-  const dbPath = resolveSqlitePath();
-  fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-
-  const sqlite = new Database(dbPath);
-  sqlite.pragma('journal_mode = WAL');
-  sqlite.pragma('foreign_keys = ON');
-
-  const db = drizzle(sqlite, { schema });
-
-  if (!_migrated) {
-    _migrated = true;
-    migrate(db, { migrationsFolder: path.resolve('./lib/db/migrations') });
-  }
-
-  return db;
-}
+let _db: ReturnType<typeof drizzle> | null = null;
 
 export function getDb() {
-  if (!_db) _db = createDb();
+  if (_db) return _db;
+
+  // Local dev without Turso → use local SQLite file via libsql
+  // Vercel + Turso → use remote libsql URL
+  const url = process.env.TURSO_URL ?? `file:${path.resolve('./dev.db')}`;
+  const authToken = process.env.TURSO_AUTH_TOKEN;
+
+  const client = createClient({ url, authToken });
+  _db = drizzle(client, { schema });
   return _db;
 }

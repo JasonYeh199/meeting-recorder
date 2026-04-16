@@ -2,8 +2,7 @@ import { NextRequest } from 'next/server';
 import { getDb } from '@/lib/db/client';
 import { meetings, uploadSessions } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import fs from 'fs';
-import path from 'path';
+import { mergeAndDeleteChunks, saveAudio } from '@/lib/storage';
 import { processMeeting } from '@/lib/process-meeting';
 
 export const maxDuration = 300;
@@ -37,24 +36,13 @@ export async function POST(_req: NextRequest, { params }: Params) {
     .set({ status: 'merging' })
     .where(eq(uploadSessions.id, uploadId));
 
-  const storagePath = process.env.AUDIO_STORAGE_PATH ?? './uploads';
-  const tmpDir = path.join(storagePath, 'tmp', uploadId);
-  const audioPath = path.join(storagePath, `${session.meetingId}.${session.ext}`);
+  // Merge chunks into final buffer, clean up chunk storage
+  const merged = await mergeAndDeleteChunks(uploadId, session.totalChunks);
 
-  // Merge all chunks into the final file
-  const fd = fs.openSync(audioPath, 'w');
-  try {
-    for (let i = 0; i < session.totalChunks; i++) {
-      const chunkPath = path.join(tmpDir, `chunk_${String(i).padStart(3, '0')}`);
-      const chunkData = fs.readFileSync(chunkPath);
-      fs.writeSync(fd, chunkData);
-    }
-  } finally {
-    fs.closeSync(fd);
-  }
-
-  // Clean up tmp chunks
-  fs.rmSync(tmpDir, { recursive: true, force: true });
+  // Save final audio file
+  const filename = `${session.meetingId}.${session.ext}`;
+  const contentType = session.ext === 'mp4' ? 'audio/mp4' : 'audio/webm';
+  const audioPath = await saveAudio(filename, merged, contentType);
 
   // Update meeting: ready for transcription
   await db

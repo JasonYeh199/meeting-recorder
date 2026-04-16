@@ -1,0 +1,6 @@
+{
+  "functions": {
+    "app/api/meetings/[id]/upload/route.ts": { "maxDuration": 300 },
+    "app/api/uploads/[uploadId]/complete/route.ts": { "maxDuration": 300 }
+  }
+}

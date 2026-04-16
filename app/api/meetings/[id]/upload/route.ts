@@ -2,8 +2,7 @@ import { NextRequest } from 'next/server';
 import { getDb } from '@/lib/db/client';
 import { meetings } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import fs from 'fs';
-import path from 'path';
+import { saveAudio } from '@/lib/storage';
 import { processMeeting } from '@/lib/process-meeting';
 
 export const maxDuration = 300;
@@ -23,15 +22,12 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   if (!audioFile) return Response.json({ error: '未收到音檔' }, { status: 400 });
 
-  const storagePath = process.env.AUDIO_STORAGE_PATH ?? './uploads';
-  fs.mkdirSync(storagePath, { recursive: true });
-
   const ext = audioFile.name.split('.').pop() ?? 'webm';
   const filename = `${id}.${ext}`;
-  const audioPath = path.join(storagePath, filename);
+  const contentType = audioFile.type || 'audio/webm';
 
   const buffer = Buffer.from(await audioFile.arrayBuffer());
-  fs.writeFileSync(audioPath, buffer);
+  const audioPath = await saveAudio(filename, buffer, contentType);
 
   await db
     .update(meetings)

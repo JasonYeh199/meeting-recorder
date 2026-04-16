@@ -2,8 +2,7 @@ import { NextRequest } from 'next/server';
 import { getDb } from '@/lib/db/client';
 import { uploadSessions } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import fs from 'fs';
-import path from 'path';
+import { deleteChunks } from '@/lib/storage';
 
 type Params = { params: Promise<{ uploadId: string }> };
 
@@ -21,11 +20,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     return new Response(null, { status: 204 });
   }
 
-  // Remove tmp chunks from disk
-  const storagePath = process.env.AUDIO_STORAGE_PATH ?? './uploads';
-  const tmpDir = path.join(storagePath, 'tmp', uploadId);
-  fs.rmSync(tmpDir, { recursive: true, force: true });
-
+  await deleteChunks(uploadId);
   await db.delete(uploadSessions).where(eq(uploadSessions.id, uploadId));
 
   return new Response(null, { status: 204 });

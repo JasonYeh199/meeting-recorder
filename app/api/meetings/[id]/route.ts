@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { getDb } from '@/lib/db/client';
 import { meetings, meetingTranscripts, meetingAnalyses, analystNotes } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import fs from 'fs';
+import { deleteAudio } from '@/lib/storage';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -62,7 +62,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   if (!meeting) return Response.json({ error: '找不到會議' }, { status: 404 });
 
   if (meeting.audioPath) {
-    fs.unlink(meeting.audioPath, () => {});
+    await deleteAudio(meeting.audioPath);
   }
 
   await db.delete(meetings).where(eq(meetings.id, id));

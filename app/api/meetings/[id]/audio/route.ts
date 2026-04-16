@@ -17,6 +17,12 @@ export async function GET(_req: NextRequest, { params }: Params) {
     return Response.json({ error: '音檔不存在' }, { status: 404 });
   }
 
+  // Blob storage (Vercel): redirect to public URL
+  if (meeting.audioPath.startsWith('https://')) {
+    return Response.redirect(meeting.audioPath, 302);
+  }
+
+  // Local filesystem
   const fullPath = path.resolve(meeting.audioPath);
   if (!fs.existsSync(fullPath)) {
     return Response.json({ error: '音檔檔案不存在' }, { status: 404 });
