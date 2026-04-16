@@ -30,9 +30,13 @@ const MAX_BYTES = 24 * 1024 * 1024; // 24 MB (Whisper limit is 25 MB)
  * directory first, then processed and cleaned up automatically.
  */
 export async function transcribeAudio(audioPathOrUrl: string): Promise<TranscriptResult> {
-  // Remote URL (Vercel Blob) — download to a temp file first
+  // Remote URL (Vercel Blob private store) — download to a temp file first
   if (audioPathOrUrl.startsWith('https://')) {
-    const res = await fetch(audioPathOrUrl);
+    const headers: Record<string, string> = {};
+    if (process.env.BLOB_READ_WRITE_TOKEN) {
+      headers['Authorization'] = `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`;
+    }
+    const res = await fetch(audioPathOrUrl, { headers });
     if (!res.ok) throw new Error(`Failed to fetch audio for transcription: ${res.status}`);
     const buffer = Buffer.from(await res.arrayBuffer());
 
