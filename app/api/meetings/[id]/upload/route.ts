@@ -27,7 +27,16 @@ export async function POST(req: NextRequest, { params }: Params) {
   const contentType = audioFile.type || 'audio/webm';
 
   const buffer = Buffer.from(await audioFile.arrayBuffer());
-  const audioPath = await saveAudio(filename, buffer, contentType);
+  console.log('[upload] size:', buffer.length, 'USE_BLOB:', !!process.env.BLOB_READ_WRITE_TOKEN);
+
+  let audioPath: string;
+  try {
+    audioPath = await saveAudio(filename, buffer, contentType);
+    console.log('[upload] saved to:', audioPath.slice(0, 60));
+  } catch (err) {
+    console.error('[upload] saveAudio failed:', err);
+    return Response.json({ error: String(err) }, { status: 500 });
+  }
 
   await db
     .update(meetings)
