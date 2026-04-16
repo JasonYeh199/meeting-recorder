@@ -9,7 +9,7 @@ export async function GET() {
     const { put, del } = await import('@vercel/blob');
     const testKey = `debug/test_${Date.now()}.txt`;
     const result = await put(testKey, Buffer.from('hello'), {
-      access: 'public',
+      access: 'private',
       contentType: 'text/plain',
     });
     await del(result.url);

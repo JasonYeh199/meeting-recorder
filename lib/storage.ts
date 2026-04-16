@@ -1,7 +1,7 @@
 /**
  * Storage abstraction layer.
  * - Local dev (no BLOB_READ_WRITE_TOKEN): uses ./uploads/ filesystem
- * - Vercel (BLOB_READ_WRITE_TOKEN set): uses Vercel Blob
+ * - Vercel (BLOB_READ_WRITE_TOKEN set): uses Vercel Blob (private store)
  */
 
 import fs from 'fs';
@@ -9,6 +9,13 @@ import path from 'path';
 
 const USE_BLOB = !!process.env.BLOB_READ_WRITE_TOKEN;
 const LOCAL_BASE = process.env.AUDIO_STORAGE_PATH ?? './uploads';
+
+/** Fetch a private Vercel Blob URL with the auth token. */
+async function fetchBlob(url: string): Promise<Response> {
+  return fetch(url, {
+    headers: { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` },
+  });
+}
 
 // ─── Audio files ──────────────────────────────────────────────────────────────
 
@@ -20,7 +27,7 @@ export async function saveAudio(
 ): Promise<string> {
   if (USE_BLOB) {
     const { put } = await import('@vercel/blob');
-    const result = await put(`audio/${key}`, buffer, { access: 'public', contentType });
+    const result = await put(`audio/${key}`, buffer, { access: 'private', contentType });
     return result.url;
   }
   const filePath = path.join(LOCAL_BASE, key);
@@ -29,10 +36,10 @@ export async function saveAudio(
   return filePath;
 }
 
-/** Read audio as Buffer from local path or URL. */
+/** Read audio as Buffer from local path or blob URL. */
 export async function readAudio(pathOrUrl: string): Promise<Buffer> {
   if (pathOrUrl.startsWith('https://')) {
-    const res = await fetch(pathOrUrl);
+    const res = await fetchBlob(pathOrUrl);
     if (!res.ok) throw new Error(`Failed to fetch audio: ${res.status}`);
     return Buffer.from(await res.arrayBuffer());
   }
@@ -64,7 +71,7 @@ export async function saveChunk(uploadId: string, index: number, buffer: Buffer)
   if (USE_BLOB) {
     const { put } = await import('@vercel/blob');
     await put(chunkBlobKey(uploadId, index), buffer, {
-      access: 'public',
+      access: 'private',
       contentType: 'application/octet-stream',
     });
   } else {
@@ -82,7 +89,7 @@ export async function readChunk(uploadId: string, index: number): Promise<Buffer
     const { blobs } = await list({ prefix: key });
     const blob = blobs.find((b) => b.pathname === key || b.pathname.endsWith(key));
     if (!blob) throw new Error(`Chunk ${index} not found in blob storage`);
-    const res = await fetch(blob.url);
+    const res = await fetchBlob(blob.url);
     return Buffer.from(await res.arrayBuffer());
   }
   return fs.readFileSync(chunkLocalPath(uploadId, index));
