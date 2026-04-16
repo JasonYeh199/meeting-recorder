@@ -4,6 +4,7 @@ import { meetings, meetingAnalyses } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 300;
 
 type Params = { params: Promise<{ id: string }> };
 
